@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Elternlohn</title>
+<meta name="theme-color" content="#E9EEF2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121A1F" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#E9EEF2;--paper:#FFFFFF;--ink:#1C2A33;--muted:#5E6E78;--line:#CBD5DC;--a:#1F7A6E}
+@media (prefers-color-scheme: dark){:root{--bg:#121A1F;--paper:#1B252C;--ink:#E6EDF1;--muted:#97A6AF;--line:#2E3C45;--a:#5CC3B3}}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{position:fixed;inset:0;width:100%;height:100%;border:0;display:block;background:var(--bg)}
+#setup{max-width:480px;margin:0 auto;padding:32px 16px;box-sizing:border-box}
+#setup h1{font-size:1.5rem;margin:0 0 8px}
+#setup p{color:var(--muted);line-height:1.45}
+#setup input{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:inherit;margin:8px 0}
+#setup button{padding:12px 16px;border:0;border-radius:10px;background:var(--a);color:#fff;font:inherit;font-weight:600}
+#err{color:#B5791A;min-height:1.4em}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<iframe id="app" title="Elternlohn" hidden></iframe>
+
+<section id="setup" hidden>
+  <h1>Elternlohn einrichten</h1>
+  <p>Füge einmalig den Link zur Web-App ein. Er endet auf <b>/exec</b>. Er wird nur auf diesem Handy gespeichert.</p>
+  <input id="url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+  <p id="err"></p>
+  <button id="save">Speichern und öffnen</button>
+</section>
+
+<script>
+(function(){
+  // Der /exec-Link steht absichtlich nicht im Code, damit er nicht öffentlich auf GitHub liegt.
+  // Er kommt einmalig über den Einrichtungslink (…/#https://script.google.com/…/exec) oder das Formular.
+  const KEY = 'elternlohn-exec-url';
+  const VALID = /^https:\/\/script\.google\.com\/(a\/[^\/]+\/)?macros\/s\/[\w-]+\/exec$/;
+  const $ = (id) => document.getElementById(id);
+  function get(){ try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function set(v){ try { localStorage.setItem(KEY, v); } catch (e) {} }
+  function del(){ try { localStorage.removeItem(KEY); } catch (e) {} }
+
+  // ?reset löscht den gespeicherten Link
+  if (new URLSearchParams(location.search).has('reset')) { del(); history.replaceState(null, '', location.pathname); }
+
+  // Einrichtungslink: Link aus dem #-Teil übernehmen und aus der Adresszeile entfernen
+  function takeHash(){
+    const h = decodeURIComponent(location.hash.slice(1)).trim();
+    if (!VALID.test(h)) return false;
+    set(h); history.replaceState(null, '', location.pathname); return true;
+  }
+  takeHash();
+
+  function open(url){
+    $('setup').hidden = true;
+    const f = $('app'); f.src = url; f.hidden = false;
+  }
+  function showSetup(msg){
+    $('app').hidden = true; $('setup').hidden = false; $('err').textContent = msg || '';
+  }
+
+  $('save').onclick = () => {
+    const v = $('url').value.trim();
+    if (!VALID.test(v)) { showSetup('Das sieht nicht wie ein Web-App-Link aus. Er beginnt mit https://script.google.com/ und endet auf /exec.'); return; }
+    set(v); open(v);
+  };
+
+  window.addEventListener('hashchange', () => { if (takeHash()) open(get()); });
+
+  const saved = get();
+  if (saved && VALID.test(saved)) open(saved); else showSetup();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>
